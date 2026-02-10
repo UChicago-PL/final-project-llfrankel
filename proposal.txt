@@ -1,0 +1,46 @@
+DESCRIPTION
+
+WEFT is a programming language I am working on for domain-agnostic multimedia creative coding. The idea is that all media are functions from coordinates to values (e.g., the red channel of an image is (x, y) → red_intensity). Programs in WEFT are graphs: nodes are computations, edges are data dependencies. The compiler needs to infer properties of each node before it can generate code:
+
+- Is this node pure (deterministic, cacheable)?
+
+- Is this node live (reads from external hardware)?
+
+- Is this node stateful (depends on history)?
+
+- Which runtime (GPU, AudioCore, MIDI, etc.) should execute it?
+
+These properties are algebraic: if node A depends on node B, and B is live, then A is live too. Combining two pure nodes yields a pure node; combining anything with a stateful node yields stateful. Domains merge by union, with a "most restrictive wins" rule for conflicting access patterns.
+
+I have a working compiler in Swift, but the analysis logic is interleaved with codegen and runtime concerns. I'd like to extract the core algorithm into a standalone Haskell implementation. This has two benefits: first, Haskell's ADTs and pattern matching make the propagation rules explicit and readable, so it would serve as a specification of the intended semantics. Second, I can use it as a verification tool: run both analyzers on the same input and diff the results to catch bugs in either implementation.
+
+The full WEFT system (compiler, UI, parser) is available at https://github.com/leo-levin/WEFT-SWIFT for context (and other language docs/info at https://weft.media). My Haskell implementation would implement only the analysis pass.
+
+The tool would read JSON exported from my Swift compiler (the program graph plus metadata about available runtimes and their primitives), propagate annotations through the graph, and output the annotated result.
+
+
+TASKS
+
+Easy: Parse JSON (using the `Aeson` package), define ADTs for the IR and annotation types, implement the effect-combination algebra.
+
+Medium: Build the dependency graph from expressions, implement the annotation pass, output annotated JSON.
+
+Challenge: Testing with QuickCheck for the algebra combinators. Generate random valid graphs and verify properties like propagation idempotence and monotonicity. A diff checker comparing Haskell output against Swift would also be nice.
+
+
+ADDITIONAL TOPICS
+The core algorithm (recursively traversing ADTs, pattern matching, building graphs, etc) would use techniques covered in class. Two libraries would require self-study:
+
+- Aeson for JSON parsing. I’ve read over some of the Hackage documentation and this doesn’t seem very difficult.
+
+- QuickCheck for property testing. This seems much more difficult, but very interesting and rewarding.
+
+Both packages seem to have extensive documentation, so I expect to learn them independently.
+
+
+
+SOURCES/INSPIRATION
+
+I'm taking an informal seminar class with Prof. Alex Warth from UCLA in which we have talked about Haskell, QuickCheck, and the general idea of implementing runtimes in various ways/languages to test them.
+
+The Swift implementation was built (not ideated) with LLM assistance. The Haskell implementation for this assignment will be entirely my own work.
