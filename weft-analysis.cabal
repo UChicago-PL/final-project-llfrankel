@@ -19,11 +19,11 @@ library
     , text
 
 executable weft-analysis
-  main-is:          Main.hs
-  hs-source-dirs:   app
-  default-language: Haskell2010
-  build-depends:
-    , base
-    , weft-analysis
-    , aeson
-    , bytestring
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    build-depends:
+      , base
+      , weft-analysis
+      , aeson
+      , bytestring
