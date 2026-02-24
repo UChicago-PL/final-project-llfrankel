@@ -137,7 +137,7 @@ position.
 
     { "type": "remap", "base": <Expr>, "substitutions": { <string>: <Expr>, ... } }
 
-Coordinate remapping. Evaluates `base` with certain coordinate fields
+Coordinate remapping. Evaluates `base` with certain coordinate fieldsw
 replaced. Substitution keys are prefixed with "me." (e.g. "me.x",
 "me.t"). For annotation purposes: the remapped dimension is removed
 from the base domain, and the substitution expression's domain is added.
