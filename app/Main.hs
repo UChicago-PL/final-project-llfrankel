@@ -2,10 +2,12 @@
 
 module Main where
 
+import Control.Arrow (ArrowChoice (right))
 import Data.Aeson (decode, encode)
 import Data.ByteString.Lazy qualified as BL
 import IR
 
+-- right now this just outputs the regular JSON so I can check if its right
 main :: IO ()
 main = do
   raw <- BL.getContents

@@ -4,6 +4,8 @@
 
 - `proposal.txt`: the original proposal for Part 1 of the project.
 
+- `progress.txt`: progress report for Part 2 of the project.
+
 - `json-specs.md`: Specification of the JSON format exported by the Swift
   compiler and consumed by this tool.
   - Describes the input schema (IR program andbackend configuration)
@@ -31,7 +33,7 @@
 
 ## /app
 
-- `Main.hs` — CLI entry point.
+- `Main.hs` — entry point.
   - Reads JSON from stdin or a file argument
   - runs all three analysis passes,
   - writes annotated results as JSON to stdout.

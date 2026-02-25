@@ -67,15 +67,9 @@ other fields are present. There are 10 expression types.
 
     { "type": "num", "value": <number> }
 
-Literal number (always a float64, even for integers).
-
 ### param
 
     { "type": "param", "name": <string> }
-
-Named parameter reference. Inside a spindle body, refers to a formal
-parameter. Also used as the indexExpr inside "index" nodes to represent
-static field access.
 
 ### index
 
@@ -112,26 +106,9 @@ argument expressions, positionally matching the spindle's params.
 
     { "type": "builtin", "name": <string>, "args": [<Expr>, ...] }
 
-Built-in function call. Two categories:
-
-Pure math builtins (no special domain behavior):
-sin, cos, tan, abs, floor, ceil, sqrt, pow, min, max,
-lerp, clamp, step, smoothstep, fract, mod, osc
-
-Primitive builtins (have domain/hardware/state implications):
-camera, texture, text, mouse, microphone, sample, cache
-
-The distinction matters for annotation: primitive builtins are listed
-in the backend's primitiveSpecs; everything else just merges its
-arguments' annotations.
-
 ### extract
 
     { "type": "extract", "call": <Expr>, "index": <int> }
-
-Extract a single return value from a multi-return spindle call.
-`call` is typically a "call" expr. `index` is the zero-based return
-position.
 
 ### remap
 
@@ -145,9 +122,6 @@ from the base domain, and the substitution expression's domain is added.
 ### cacheRead
 
     { "type": "cacheRead", "cacheId": <string>, "tapIndex": <int> }
-
-Read from a cache history buffer. Used internally to break cycles in
-feedback effects. Always stateful.
 
 ## BackendSpec
 
