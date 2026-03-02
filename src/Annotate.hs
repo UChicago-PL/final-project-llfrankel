@@ -57,15 +57,15 @@ memoized :: String -> Annotator Annotation -> Annotator Annotation
 memoized key compute = do
   st <- get
   case Map.lookup key (stMemo st) of
-    Just ann -> return ann
+    Just ann -> pure ann
     Nothing
-      | Set.member key (stComputing st) -> return $ mempty {aStateful = True}
+      | Set.member key (stComputing st) -> pure $ mempty {aStateful = True}
       | otherwise -> do
           modify $ \s -> s {stComputing = Set.insert key (stComputing s)}
           ann <- compute
           modify $ \s ->
             s {stMemo = Map.insert key ann (stMemo s), stComputing = Set.delete key (stComputing s)}
-          return ann
+          pure ann
 
 makeKey :: String -> Expr -> String
 makeKey bundle (Param field) = bundle ++ "." ++ field
@@ -89,28 +89,28 @@ findBundleStrand b e env = do
 
 annotateExpr :: Expr -> Annotator Annotation
 annotateExpr expr = case expr of
-  Num _ -> return mempty
+  Num _ -> pure mempty
   Param name -> asks (lookupCoord name)
-  CacheRead _ _ -> return $ mempty {aStateful = True}
+  CacheRead _ _ -> pure $ mempty {aStateful = True}
   Unary _ e -> annotateExpr e
   Extract e _ -> annotateExpr e
   Binary _ l r -> (<>) <$> annotateExpr l <*> annotateExpr r
   Call _ args -> mconcat <$> mapM annotateExpr args
   Builtin name args -> annotateBuiltin name args
   Index "me" (Param field) -> asks (lookupCoord field)
-  Index "me" _ -> return mempty
+  Index "me" _ -> pure mempty
   Index b e -> do
     let key = makeKey b e
     memoized key $ do
       strand <- asks (findBundleStrand b e)
-      maybe (return mempty) (annotateExpr . strandExpr) strand
+      maybe (pure mempty) (annotateExpr . strandExpr) strand
   Remap base subs -> annotateRemap base subs
 
 annotateBuiltin :: String -> [Expr] -> Annotator Annotation
 annotateBuiltin name args = do
   merged <- mconcat <$> mapM annotateExpr args
   spec <- asks (Map.lookup name . envPrimitives)
-  return $ case spec of
+  pure $ case spec of
     Nothing -> merged
     Just s ->
       Annotation
@@ -127,7 +127,7 @@ annotateRemap base subs = do
   subAnns <- mconcat <$> mapM annotateExpr (Map.elems subs)
   let removedDims = map (fromMaybe <*> stripPrefix "me.") (Map.keys subs)
       baseDomain = foldr Map.delete (aDomain baseAnn) removedDims
-  return $
+  pure $
     Annotation
       { aDomain = baseDomain <> aDomain subAnns,
         aHardware = aHardware baseAnn <> aHardware subAnns,
