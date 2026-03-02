@@ -125,7 +125,7 @@ annotateRemap :: Expr -> Map String Expr -> Annotator Annotation
 annotateRemap base subs = do
   baseAnn <- annotateExpr base
   subAnns <- mconcat <$> mapM annotateExpr (Map.elems subs)
-  let removedDims = map (fromMaybe <*> stripPrefix "me.") (Map.keys subs)
+  let removedDims = map (\k -> fromMaybe k (stripPrefix "me." k)) (Map.keys subs)
       baseDomain = foldr Map.delete (aDomain baseAnn) removedDims
   pure $
     Annotation

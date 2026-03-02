@@ -5,20 +5,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import IR
-
-bundleRefs :: Expr -> Set String
-bundleRefs expr = case expr of
-  Num _ -> mempty
-  Param _ -> mempty
-  CacheRead _ _ -> mempty
-  Index "me" e -> bundleRefs e
-  Index b e -> Set.insert b $ bundleRefs e
-  Binary _ l r -> bundleRefs l <> bundleRefs r
-  Unary _ e -> bundleRefs e
-  Call _ args -> foldMap bundleRefs args
-  Builtin _ args -> foldMap bundleRefs args
-  Extract e _ -> bundleRefs e
-  Remap b subs -> bundleRefs b <> foldMap bundleRefs (Map.elems subs)
+import IRHelpers
 
 -- | Build a dependency graph from a program. Each bundle maps to the
 -- set of other bundles it references. Self-references are excluded.

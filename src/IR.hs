@@ -5,6 +5,9 @@ module IR where
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Map (Map)
+import qualified Data.Map as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 data Access = Free | Bound
   deriving (Show, Eq)
