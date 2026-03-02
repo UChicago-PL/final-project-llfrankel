@@ -1,1 +1,30 @@
 Working through this in Haskell has helped me realize that I was doing all my dependency graph and annotation stuff super backwards.
+
+
+Before I did all the annotations and then passed that to the graph and then partitioned, which was needlessly complex and didn't actually end up adding much. Instead, I should do:
+
+IR Program -> Dependency Graph -> Partition -> SwatchGraph -> Annotate
+
+
+ A swatch is one backend's compilation unit — the set of bundles it's responsible for compiling, plus the cross-domain buffers it reads from and writes to. If your program has visual and audio stuff, you get two swatches. If it's visual-only, you get one.
+
+
+
+
+Partition takes:
+  - Dep graph
+  - Map BuiltinName BackendId — hardware ownership
+  - Map BundleName BackendId — sinks
+  - A function BundleName -> Set BuiltinName — direct builtin scan
+
+Annotate takes:
+  - The swatch's bundle set + their expressions
+  - That backend's coordinateSpecs (only its own dims)
+  - PrimitiveSpecs for builtins in that backend
+
+Codegen takes:
+  - The swatch
+  - The annotations
+  - Backend-specific config
+
+The key property: partition is purely structural (graph + names), annotation is semantic (types + properties), and they don't depend on each other. Partition doesn't need to know what me.x means. Annotation doesn't need to know what other swatches exist.
