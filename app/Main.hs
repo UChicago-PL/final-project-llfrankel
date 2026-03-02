@@ -2,7 +2,6 @@
 
 module Main where
 
-import Control.Arrow (ArrowChoice (right))
 import Data.Aeson (decode, encode)
 import Data.ByteString.Lazy qualified as BL
 import IR
