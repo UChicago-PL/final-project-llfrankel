@@ -112,27 +112,23 @@ annotateBuiltin name args = do
   spec <- asks (Map.lookup name . envPrimitives)
   pure $ case spec of
     Nothing -> merged
-    Just s ->
-      Annotation
-        { aDomain = case primOutputDomain s of
-            [] -> aDomain merged
-            ds -> Map.fromList [(dimName d, d) | d <- ds],
-          aHardware = aHardware merged <> Set.fromList (primHardware s),
-          aStateful = aStateful merged || primAddsState s
-        }
+    Just s -> overrideDomain s merged <> specAnnotation s
+  where
+    overrideDomain s ann = case primOutputDomain s of
+      [] -> ann
+      ds -> ann {aDomain = Map.fromList [(dimName d, d) | d <- ds]}
+    specAnnotation s =
+      mempty {aHardware = Set.fromList (primHardware s), aStateful = primAddsState s}
 
 annotateRemap :: Expr -> Map String Expr -> Annotator Annotation
 annotateRemap base subs = do
   baseAnn <- annotateExpr base
   subAnns <- mconcat <$> mapM annotateExpr (Map.elems subs)
-  let removedDims = map (\k -> fromMaybe k (stripPrefix "me." k)) (Map.keys subs)
-      baseDomain = foldr Map.delete (aDomain baseAnn) removedDims
-  pure $
-    Annotation
-      { aDomain = baseDomain <> aDomain subAnns,
-        aHardware = aHardware baseAnn <> aHardware subAnns,
-        aStateful = aStateful baseAnn || aStateful subAnns
-      }
+  let removedDims = map stripMe (Map.keys subs)
+  pure $ removeDims removedDims baseAnn <> subAnns
+  where
+    stripMe k = fromMaybe k (stripPrefix "me." k)
+    removeDims dims ann = ann {aDomain = foldr Map.delete (aDomain ann) dims}
 
 annotateProgram :: AnnotateEnv -> Map String Annotation
 annotateProgram env = runAnnotation env $ do

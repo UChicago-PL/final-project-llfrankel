@@ -1,0 +1,47 @@
+
+See `docs/weft.txt` for background on and terminology.
+
+==== WHAT'S DONE ====
+All three proposed "easy" tasks and most of the "medium" tasks are complete.
+
+Modules
+- IR.hs : ADTs for the full WEFT IR, as well as Aeson `fromJSON` and `toJSON` for
+  each IR node type
+- IRHelpers.hs
+- DepGraph.hs : Dependency graph construction, topological sort with
+  cycle detection, graph reversal, and transitive dependencies
+- Annotate.hs : Per-strand annotation. Computes domain hardware requirements, and
+  statefulness
+- Partition.hs: Routes bundles to backends. Computes backend claims (hardware
+  ownership + sink declarations), validates for conflicts, expands each backend's
+  swatch with pure transitive dependencies, and detects cross-swatch requirements
+
+==== WHAT CHANGED ====
+The biggest change from my proposal: I originally planned to just reimplement the
+Swift analysis pass in Haskell. Instead, re-working through it functionally helped
+me realize some core architectural mistakes I was making. I rethought the structure
+and found a cleaner design that makes a lot more sense. Hopefully I will be able to
+verify the results of my new Haskell design, and then implement it in Swift.
+
+In the Swift compiler, annotation runs before partitioning on the whole program at
+once, with a single merged environment from all backends. This meant that when two
+backends define the same coordinate, one arbitrarily wins.
+
+In my Haskell version, partitioning comes first and annotation runs per-swatch
+afterward with only that backend's semantics. This means the same bundle (like
+"amplitude") gets different annotations under different backends: "time" is treated
+sequentially in visual domains, but can be seeked/parallelized in audio domains.
+The Swift version right now can't express this.
+
+
+
+==== WHAT'S NEXT ====
+- Annotated JSON output: add ToJSON instances for Annotation, Swatch, and
+  SwatchGraph so the tool can output structured JSON instead of debug text. This
+  would let the Swift compiler consume the Haskell analysis results, which would
+  be super cool.
+
+- QuickCheck testing
+
+- Diff checker: run both the Swift and Haskell analyzers on the same input and
+  compare outputs to catch bugs in either implementation.
