@@ -8,3 +8,6 @@ ACKNOWLEDGEMENTS
 
 - `json-specs.md` I already had written from previous work, and was written/documented
   using AI tools.
+
+- I did use AI tools to help me sort out my .cabal file. I was having a hard time
+  setting up src/ as a library that Main.hs could call.
