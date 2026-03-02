@@ -150,9 +150,8 @@ from the base domain, and the substitution expression's domain is added.
 
 - `name` — dimension name (e.g. "x", "y", "t", "i", "sampleRate").
 - `access` — either "free" or "bound".
-  - "free" means seekable: can sample at any value (spatial coordinates).
+  - "free" means seekable: can sample at any value
   - "bound" means time-constrained: only the current value is available
-    (time, resolution, sample rate).
 
 ## PrimitiveSpec
 

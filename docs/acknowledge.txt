@@ -1,0 +1,7 @@
+
+
+- Aeson Hackage documentation (https://hackage.haskell.org/package/aeson-0.9.0.1/docs/Data-Aeson.html)
+  - Used for `IR.hs` Aeson encoding/decoding and troubleshooting that
+
+
+- I'm taking an informal seminar class with Prof. Alex Warth from UCLA in which we have talked about Haskell, QuickCheck, and the general idea of implementing runtimes in various ways/languages to test them. We talked about how I was approaching this project. Nothing specific about implementation, more generally the benefit of implementing some of the analysis in Haskell to check my original Swift implementation.

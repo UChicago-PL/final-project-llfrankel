@@ -6,6 +6,10 @@
 
 - `progress.txt`: progress report for Part 2 of the project.
 
+- `acknowledge.txt`: acknowledgements/citations
+
+- all `.md` files are my working notes.
+
 - `json-specs.md`: Specification of the JSON format exported by the Swift
   compiler and consumed by this tool.
   - Describes the input schema (IR program andbackend configuration)

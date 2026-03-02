@@ -17,6 +17,7 @@ library
     , bytestring
     , containers
     , text
+    , mtl
 
 executable weft-analysis
     main-is:          Main.hs
@@ -27,3 +28,4 @@ executable weft-analysis
       , weft-analysis
       , aeson
       , bytestring
+      , containers

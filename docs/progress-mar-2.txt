@@ -1,0 +1,1 @@
+Working through this in Haskell has helped me realize that I was doing all my dependency graph and annotation stuff super backwards.
