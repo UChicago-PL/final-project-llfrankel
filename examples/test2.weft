@@ -1,0 +1,47 @@
+#include "std_noise.weft"
+#include "std_io.weft"
+
+spindle rotate(x, y, cx, cy, angle) {
+    dv[x,y] = [x - cx, y - cy]
+    return.0 = dv.x * cos(angle) - dv.y * sin(angle) + cx
+    return.1 = dv.x * sin(angle) + dv.y * cos(angle) + cy
+}
+
+// how many cells we want
+n.val = 3
+
+// floor and fract split me.x, me.y into two coordinate systems:
+//   cell — which cell (integer, constant within each cell)
+//   grid — where in that cell (fractional, 0-1 per cell)
+cell[x,y] = [floor(me.x * n.val), floor(me.y * n.val)]
+aspect.val = me.w / me.h
+grid[x,y] = [me.x,me.y] -> {fract((0..2) * n.val)} -> {1-.0, .1}
+    -> {(.0 - 0.5) * aspect.val + 0.5, .1}
+    -> {rotate(.0, .1, 0.5, 0.5, me.t)}
+    -> {(.0 - 0.5) / aspect.val + 0.5, .1}
+
+
+// sample camera at local cell coordinates instead of global position
+// normally camera sees me.x, me.y — the full 0-1 range across the screen
+// grid.x, grid.y repeat 0-1 within each cell, so every cell gets the full camera image
+im[r,g,b] = camera(1-me.x, me.y)
+
+img[r,g,b] = im -> {(0..3)(me.x ~ grid.x / 2 + 0.25, me.y ~ grid.y/2 +0.25)}
+
+
+
+// cell coordinates are constant per cell, so the tint is uniform per cell
+t.val = me.t * 2
+phase.val = fract(t.val)
+
+// get two different color values for each cell with a hash function
+from[r,g,b] = [0,1,2] -> {_hash31(cell.x, cell.y, floor(t.val) + (0..3))}
+to[r,g,b] = [0,1,2] -> {_hash31(cell.x, cell.y, floor(t.val) + (0..3) + 1)}
+
+// linearly switch between the two
+tint[r,g,b] = from -> {lerp((0..3), to.(0..3), phase.val)}
+
+// tint each cell's video by its color (difference)
+display[r,g,b] = img -> {abs((0..3) - tint.(0..3))}
+
+//display[r,g,b] = [grid.x, grid.y, 0]
