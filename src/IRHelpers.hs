@@ -1,3 +1,6 @@
+-- HLS reccomended this guy, seems useful
+{-# LANGUAGE LambdaCase #-}
+
 module IRHelpers (bundleRefs, exprBuiltins, bundleBuiltins) where
 
 import Data.Map (Map)
@@ -9,27 +12,24 @@ import IR
 bundleBuiltins :: Bundle -> Set String
 bundleBuiltins b = foldMap (exprBuiltins . strandExpr) (bundleStrands b)
 
+foldMapExpr :: (Monoid m) => (Expr -> m) -> Expr -> m
+foldMapExpr f expr =
+  f expr <> case expr of
+    Binary _ l r -> foldMapExpr f l <> foldMapExpr f r
+    Unary _ e -> foldMapExpr f e
+    Call _ args -> foldMap (foldMapExpr f) args
+    Builtin _ args -> foldMap (foldMapExpr f) args
+    Index _ e -> foldMapExpr f e
+    Extract e _ -> foldMapExpr f e
+    Remap b subs -> foldMapExpr f b <> foldMap (foldMapExpr f) (Map.elems subs)
+    _ -> mempty
+
 exprBuiltins :: Expr -> Set String
-exprBuiltins expr = case expr of
-  Builtin name args -> Set.insert name (foldMap exprBuiltins args)
-  Binary _ l r -> exprBuiltins l <> exprBuiltins r
-  Unary _ e -> exprBuiltins e
-  Call _ args -> foldMap exprBuiltins args
-  Index _ e -> exprBuiltins e
-  Extract e _ -> exprBuiltins e
-  Remap b subs -> exprBuiltins b <> foldMap exprBuiltins (Map.elems subs)
+exprBuiltins = foldMapExpr $ \case
+  Builtin name _ -> Set.singleton name
   _ -> mempty
 
 bundleRefs :: Expr -> Set String
-bundleRefs expr = case expr of
-  Num _ -> mempty
-  Param _ -> mempty
-  CacheRead _ _ -> mempty
-  Index "me" e -> bundleRefs e
-  Index b e -> Set.insert b $ bundleRefs e
-  Binary _ l r -> bundleRefs l <> bundleRefs r
-  Unary _ e -> bundleRefs e
-  Call _ args -> foldMap bundleRefs args
-  Builtin _ args -> foldMap bundleRefs args
-  Extract e _ -> bundleRefs e
-  Remap b subs -> bundleRefs b <> foldMap bundleRefs (Map.elems subs)
+bundleRefs = foldMapExpr $ \case
+  Index b _ | b /= "me" -> Set.singleton b
+  _ -> mempty
