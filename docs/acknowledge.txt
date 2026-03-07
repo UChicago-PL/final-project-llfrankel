@@ -11,3 +11,7 @@ ACKNOWLEDGEMENTS
 
 - I did use AI tools to help me sort out my .cabal file. I was having a hard time
   setting up src/ as a library that Main.hs could call.
+
+- I've been reading about/implementing some of HLS's suggestions. Some I have ignored because I read the docs
+  and they still seemed very confusing. But ones I understood I tried to implement.
+    - I've made note of this in most places, with a comment like "-- HLS reccomended"

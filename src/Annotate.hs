@@ -50,9 +50,12 @@ data AnnotateState = AnnotateState
 
 type Annotator a = ReaderT AnnotateEnv (State AnnotateState) a
 
+-- | Run an annotation computation with the given environment.
 runAnnotation :: AnnotateEnv -> Annotator a -> a
 runAnnotation env m = evalState (runReaderT m env) (AnnotateState Map.empty Set.empty)
 
+-- | Cache the result of an annotation computation. If already computed, return
+-- the cached result. If currently being computed (cycle), assume stateful.
 memoized :: String -> Annotator Annotation -> Annotator Annotation
 memoized key compute = do
   st <- get
@@ -67,26 +70,32 @@ memoized key compute = do
             s {stMemo = Map.insert key ann (stMemo s), stComputing = Set.delete key (stComputing s)}
           pure ann
 
+-- | Build a memoization key from a bundle name and index expression.
 makeKey :: String -> Expr -> String
 makeKey bundle (Param field) = bundle ++ "." ++ field
 makeKey bundle (Num n) = bundle ++ "." ++ show (floor n :: Int)
 makeKey bundle _ = bundle
 
+-- | Find a strand in a list by name (Param) or numeric index (Num).
 findStrand :: Expr -> [Strand] -> Maybe Strand
 findStrand (Param field) strands = find (\s -> strandName s == field) strands
 findStrand (Num n) strands = find (\s -> strandIndex s == floor n) strands
 findStrand _ _ = Nothing
 
+-- | Look up a coordinate name and return its dimension as an annotation.
 lookupCoord :: String -> AnnotateEnv -> Annotation
 lookupCoord name env = case Map.lookup name (envCoords env) of
   Just dim -> mempty {aDomain = Map.singleton (dimName dim) dim}
   Nothing -> mempty
 
+-- | Find a specific strand within a named bundle.
 findBundleStrand :: String -> Expr -> AnnotateEnv -> Maybe Strand
 findBundleStrand b e env = do
   bun <- Map.lookup b (envBundles env)
   findStrand e (bundleStrands bun)
 
+-- | Compute the annotation for an expression by collecting domain dimensions,
+-- hardware requirements, and statefulness from its subexpressions.
 annotateExpr :: Expr -> Annotator Annotation
 annotateExpr expr = case expr of
   Num _ -> pure mempty
@@ -94,7 +103,7 @@ annotateExpr expr = case expr of
   CacheRead _ _ -> pure $ mempty {aStateful = True}
   Unary _ e -> annotateExpr e
   Extract e _ -> annotateExpr e
-  Binary _ l r -> (<>) <$> annotateExpr l <*> annotateExpr r
+  Binary _ l r -> liftA2 (<>) (annotateExpr l) (annotateExpr r)
   Call _ args -> mconcat <$> mapM annotateExpr args
   Builtin name args -> annotateBuiltin name args
   Index "me" (Param field) -> asks (lookupCoord field)
@@ -106,6 +115,8 @@ annotateExpr expr = case expr of
       maybe (pure mempty) (annotateExpr . strandExpr) strand
   Remap base subs -> annotateRemap base subs
 
+-- | Annotate a builtin call: merge argument annotations, then override with
+-- the primitive's output domain and hardware spec if one exists.
 annotateBuiltin :: String -> [Expr] -> Annotator Annotation
 annotateBuiltin name args = do
   merged <- mconcat <$> mapM annotateExpr args
@@ -120,6 +131,8 @@ annotateBuiltin name args = do
     specAnnotation s =
       mempty {aHardware = Set.fromList (primHardware s), aStateful = primAddsState s}
 
+-- | Annotate a remap: combine base and substitution annotations, removing
+-- the remapped dimensions from the base.
 annotateRemap :: Expr -> Map String Expr -> Annotator Annotation
 annotateRemap base subs = do
   baseAnn <- annotateExpr base
@@ -130,6 +143,7 @@ annotateRemap base subs = do
     stripMe k = fromMaybe k (stripPrefix "me." k)
     removeDims dims ann = ann {aDomain = foldr Map.delete (aDomain ann) dims}
 
+-- | Annotate every strand in the program and return the full memo table.
 annotateProgram :: AnnotateEnv -> Map String Annotation
 annotateProgram env = runAnnotation env $ do
   let keys =

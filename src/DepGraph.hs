@@ -1,4 +1,11 @@
-module DepGraph (buildGraph, topoSort, dependents, transDeps) where
+module DepGraph
+  ( DepGraph,
+    buildGraph,
+    topoSort,
+    dependents,
+    transDeps,
+  )
+where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -7,15 +14,17 @@ import qualified Data.Set as Set
 import IR
 import IRHelpers
 
+type DepGraph = Map String (Set String)
+
 -- | Build a dependency graph from a program. Each bundle maps to the
 -- set of other bundles it references. Self-references are excluded.
-buildGraph :: Program -> Map String (Set String)
+buildGraph :: Program -> DepGraph
 buildGraph prog = Map.mapWithKey Set.delete raw
   where
     raw = Map.map refsForBundle $ progBundles prog
     refsForBundle b = foldMap (bundleRefs . strandExpr) (bundleStrands b)
 
-topoSort :: Map String (Set String) -> Maybe [String]
+topoSort :: DepGraph -> Maybe [String]
 topoSort graph = reverse <$> visit (Map.keys graph) Set.empty Set.empty []
   where
     visit [] _ _ result = Just result
@@ -29,7 +38,7 @@ topoSort graph = reverse <$> visit (Map.keys graph) Set.empty Set.empty []
           visit ns (Set.insert n visited) (Set.delete n visiting') (n : result')
 
 -- | Reverse the dependency graph: for each bundle, which bundles depend on it.
-dependents :: Map String (Set String) -> Map String (Set String)
+dependents :: DepGraph -> DepGraph
 dependents graph =
   Map.fromListWith
     Set.union
@@ -39,7 +48,7 @@ dependents graph =
     ]
 
 -- | All bundles reachable from a starting node, transitively.
-transDeps :: Map String (Set String) -> String -> Set String
+transDeps :: DepGraph -> String -> Set String
 transDeps graph start = dfs Set.empty (Map.findWithDefault Set.empty start graph)
   where
     dfs = Set.foldl' visit

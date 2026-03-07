@@ -11,13 +11,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import DepGraph (transDeps)
-
-type BackendId = String
-
-type BundleName = String
-
-type BackendBundles = Map BackendId (Set BundleName)
+import DepGraph (DepGraph, transDeps)
 
 data Swatch = Swatch
   { swatchBackend :: BackendId,
@@ -39,24 +33,46 @@ data PartError
   | HardwareConflict BundleName (Set BackendId)
   deriving (Show, Eq)
 
+type BackendId = String
+
+type BundleName = String
+
+type BackendBundles = Map BackendId (Set BundleName)
+
+type HardwareMap = Map String BackendId
+
+type SinkMap = Map BundleName BackendId
+
 data PartInput = PartInput
-  { partGraph :: Map BundleName (Set BundleName),
-    partHardware :: Map String BackendId,
-    partSinks :: Map BundleName BackendId,
+  { partGraph :: DepGraph,
+    partHardware :: HardwareMap,
+    partSinks :: SinkMap,
     partBuiltins :: Map BundleName (Set String)
   }
 
+-- | Partition a program's bundles into backend-specific swatches.
+partition :: PartInput -> Either PartError SwatchGraph
+partition input = do
+  let graph = partGraph input
+      sinks = partSinks input
+      claims = computeClaims input
+  routes <- validateClaims claims
+  let (grouped, pures) = splitRoutes routes
+      expanded = expandPure graph pures grouped
+      inputs = findInputs graph expanded
+      outputs = findOutputs expanded inputs
+  pure $ buildSwatches sinks expanded inputs outputs
+
+-- | Which backend (if any) claim each bundle, based on hardware requirements and output assignments
 computeClaims :: PartInput -> Map BundleName (Set BackendId)
 computeClaims input = Map.mapWithKey claims (partBuiltins input)
   where
     claims bundle bs = hwClaims bs <> sinkClaim bundle
-    hwClaims = foldMap hwLookup
-    hwLookup b = maybe mempty Set.singleton (Map.lookup b (partHardware input))
-    sinkClaim bundle = maybe mempty Set.singleton (Map.lookup bundle (partSinks input))
+    hwClaims = foldMap $ \b -> foldMap Set.singleton $ Map.lookup b (partHardware input)
+    sinkClaim bundle = foldMap Set.singleton $ Map.lookup bundle (partSinks input)
 
-validateClaims ::
-  Map BundleName (Set BackendId) ->
-  Either PartError (Map BundleName (Maybe BackendId))
+-- | check that no bundle is claimed by multiple backends
+validateClaims :: Map BundleName (Set BackendId) -> Either PartError (Map BundleName (Maybe BackendId))
 validateClaims = Map.traverseWithKey validate
   where
     validate bundle cs = case Set.toList cs of
@@ -64,6 +80,7 @@ validateClaims = Map.traverseWithKey validate
       [bid] -> Right (Just bid)
       _ -> Left (HardwareConflict bundle cs)
 
+-- | split validated claims into backend-grouped bundles and unclaimed (pure) bundles
 splitRoutes :: Map BundleName (Maybe BackendId) -> (BackendBundles, Set BundleName)
 splitRoutes routes = (grouped, pures)
   where
@@ -73,33 +90,37 @@ splitRoutes routes = (grouped, pures)
         [(bid, Set.singleton b) | (b, Just bid) <- Map.toList routes]
     pures = Set.fromList [b | (b, Nothing) <- Map.toList routes]
 
-expandPure :: PartInput -> Set BundleName -> BackendBundles -> BackendBundles
-expandPure input pures = Map.map expand
+-- | Expand each backends bundle set to include any pure (unclaimed) bundles it transitiviely depends on
+expandPure :: DepGraph -> Set BundleName -> BackendBundles -> BackendBundles
+expandPure graph pures = Map.map expand
   where
     expand bundles =
-      let allDeps = foldMap (transDeps (partGraph input)) (Set.toList bundles)
+      let allDeps = foldMap (transDeps graph) (Set.toList bundles)
        in bundles <> Set.intersection pures allDeps
 
-findInputs :: PartInput -> BackendBundles -> Map BackendId (Set BundleName)
-findInputs input = Map.map inputsOf
+-- | For each backend, find bundles it reads from other backends
+findInputs :: DepGraph -> BackendBundles -> Map BackendId (Set BundleName)
+findInputs graph = Map.map inputsOf
   where
     inputsOf bundles = depsOf bundles `Set.difference` bundles
     depsOf bundles = foldMap directDeps (Set.toList bundles)
-    directDeps b = Map.findWithDefault mempty b (partGraph input)
+    directDeps b = Map.findWithDefault mempty b graph
 
+-- | For each backend, find its bundles that other backends read from
 findOutputs :: BackendBundles -> Map BackendId (Set BundleName) -> Map BackendId (Set BundleName)
 findOutputs expanded inputs = Map.map outputsOf expanded
   where
     allInputs = mconcat (Map.elems inputs)
     outputsOf bundles = Set.intersection bundles allInputs
 
+-- | Assemble the final swatch graph from expanded bundles, inputs, and outputs.
 buildSwatches ::
-  PartInput ->
+  SinkMap ->
   BackendBundles ->
   Map BackendId (Set BundleName) ->
   Map BackendId (Set BundleName) ->
   SwatchGraph
-buildSwatches input expanded inputs outputs =
+buildSwatches sinks expanded inputs outputs =
   SwatchGraph
     { swatches = map mkSwatch (Map.keys expanded),
       bundleToSwatch =
@@ -118,14 +139,4 @@ buildSwatches input expanded inputs outputs =
       where
         bundles = lookupSet bid expanded
     lookupSet = Map.findWithDefault mempty
-    isSinkFor bid b = Map.lookup b (partSinks input) == Just bid
-
-partition :: PartInput -> Either PartError SwatchGraph
-partition input = do
-  let claims = computeClaims input
-  routes <- validateClaims claims
-  let (grouped, pures) = splitRoutes routes
-      expanded = expandPure input pures grouped
-      inputs = findInputs input expanded
-      outputs = findOutputs expanded inputs
-  Right (buildSwatches input expanded inputs outputs)
+    isSinkFor bid b = Map.lookup b sinks == Just bid
