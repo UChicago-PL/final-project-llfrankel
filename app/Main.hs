@@ -27,7 +27,7 @@ main = do
           graph = buildGraph prog
           hwMap = Map.fromList [(hw, backendId b) | b <- backends, hw <- backendHardware b]
           sinkMap = Map.fromList [(s, backendId b) | b <- backends, s <- backendSinks b]
-          builtins = Map.map bundleBuiltins (progBundles prog)
+          builtins = Map.map (bundleHardware prims) (progBundles prog)
           partInput = PartInput graph hwMap sinkMap builtins
       case partition partInput of
         Left err -> putStrLn $ "PARTITION FAILED: " ++ show err

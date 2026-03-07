@@ -1,7 +1,7 @@
 -- HLS reccomended this guy, seems useful
 {-# LANGUAGE LambdaCase #-}
 
-module IRHelpers (bundleRefs, exprBuiltins, bundleBuiltins) where
+module IRHelpers (bundleRefs, exprBuiltins, bundleBuiltins, bundleHardware) where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -11,6 +11,11 @@ import IR
 
 bundleBuiltins :: Bundle -> Set String
 bundleBuiltins b = foldMap (exprBuiltins . strandExpr) (bundleStrands b)
+
+bundleHardware :: Map String PrimitiveSpec -> Bundle -> Set String
+bundleHardware prims b =
+  foldMap (\name -> maybe Set.empty (Set.fromList . primHardware) (Map.lookup name prims))
+    (bundleBuiltins b)
 
 foldMapExpr :: (Monoid m) => (Expr -> m) -> Expr -> m
 foldMapExpr f expr =
