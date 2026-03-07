@@ -14,8 +14,9 @@ bundleBuiltins b = foldMap (exprBuiltins . strandExpr) (bundleStrands b)
 
 bundleHardware :: Map String PrimitiveSpec -> Bundle -> Set String
 bundleHardware prims b =
-  foldMap (\name -> maybe Set.empty (Set.fromList . primHardware) (Map.lookup name prims))
-    (bundleBuiltins b)
+  foldMap
+    (\name -> maybe Set.empty (Set.fromList . primHardware) (Map.lookup name prims))
+    $ bundleBuiltins b
 
 foldMapExpr :: (Monoid m) => (Expr -> m) -> Expr -> m
 foldMapExpr f expr =
