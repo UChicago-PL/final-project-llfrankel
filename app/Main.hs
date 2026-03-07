@@ -3,14 +3,15 @@
 module Main where
 
 import Annotate
-import Data.Aeson (decode)
+import Data.Aeson (decode, encode)
 import Data.ByteString.Lazy qualified as BL
 import Data.Map qualified as Map
 import DepGraph
 import IR
 import IRHelpers
+import Output
+import Partition
 
--- right now this just outputs the regular JSON so I can check if its right
 main :: IO ()
 main = do
   raw <- BL.getContents
@@ -24,6 +25,10 @@ main = do
           env = AnnotateEnv (progBundles prog) coords prims
           annotations = annotateProgram env
           graph = buildGraph prog
-      putStrLn $ "Bundles: " ++ show (Map.keys (progBundles prog))
-      putStrLn $ "Graph: " ++ show graph
-      putStrLn $ "Annotations: " ++ show annotations
+          hwMap = Map.fromList [(hw, backendId b) | b <- backends, hw <- backendHardware b]
+          sinkMap = Map.fromList [(s, backendId b) | b <- backends, s <- backendSinks b]
+          builtins = Map.map bundleBuiltins (progBundles prog)
+          partInput = PartInput graph hwMap sinkMap builtins
+      case partition partInput of
+        Left err -> putStrLn $ "PARTITION FAILED: " ++ show err
+        Right sg -> BL.putStr $ encode (buildOutput annotations graph sg backends prog)

@@ -10,13 +10,13 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 
 data Access = Free | Bound
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data Dimension = Dimension
   { dimName :: String,
     dimAccess :: Access
   }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 data PrimitiveSpec = PrimitiveSpec
   { primName :: String,
