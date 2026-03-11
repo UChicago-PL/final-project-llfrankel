@@ -1,11 +1,7 @@
 module Main where
 
-import AnnotateTest (annotateTests)
-import DepGraphTest (depGraphTests)
-import PartitionTest (partitionTests)
+import AnnotateMonoidTest (annotateMonoidTests)
 
 main :: IO ()
 main = do
-  depGraphTests
-  partitionTests
-  annotateTests
+  annotateMonoidTests
