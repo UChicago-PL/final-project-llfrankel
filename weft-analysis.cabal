@@ -48,11 +48,7 @@ test-suite weft-tests
     type:             exitcode-stdio-1.0
     main-is:          Main.hs
     other-modules:
-      DepGraphTest
-      PartitionTest
-      AnnotateTest
       AnnotateMonoidTest
-      Generators
     hs-source-dirs:   test
     default-language: Haskell2010
     build-depends:
