@@ -48,4 +48,9 @@ The Swift version right now can't express this.
 
 
 ==== RESPONSE ====
-Good work so far! It took me a bit of reading in the swift WEFT repo to understand fully what the IR pieces represent, but I think you've achieved your goal of the Haskell version of the propagation rules acting as a specification. It probably wouldn't hurt to give your IR datatypes some descriptive comments to make it clearer what each constructor represents without needing to refer to the original repo, though.
+Good work so far! It took me a bit of reading in the swift WEFT repo to
+understand fully what the IR pieces represent, but I think you've achieved your
+goal of the Haskell version of the propagation rules acting as a specification.
+It probably wouldn't hurt to give your IR datatypes some descriptive comments to
+make it clearer what each constructor represents without needing to refer to
+the original repo, though.

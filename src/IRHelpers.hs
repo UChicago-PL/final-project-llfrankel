@@ -21,6 +21,7 @@ bundleHardware prims b =
     $ bundleBuiltins b
 
 -- generic fold over the expression tree
+-- being able to define this so cleanly is super cool.
 foldMapExpr :: (Monoid m) => (Expr -> m) -> Expr -> m
 foldMapExpr f expr =
   f expr <> case expr of

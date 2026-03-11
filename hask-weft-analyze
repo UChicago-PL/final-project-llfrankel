@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WEFT_EXPORT="$SCRIPT_DIR/weft-export"
+WEFT_EXPORT="$SCRIPT_DIR/weft-export-2"
 
 RAW=false
 FILE=""
@@ -23,15 +23,16 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
+ANALYSIS_BIN=$(cabal list-bin weft-analysis 2>/dev/null)
+DIFF_BIN=$(cabal list-bin weft-diff 2>/dev/null)
+
 swift_out=$(mktemp)
 hask_out=$(mktemp)
 trap 'rm -f "$swift_out" "$hask_out"' EXIT
 
-# Swift analysis
 "$WEFT_EXPORT" --analyze "$FILE" > "$swift_out"
 
-# Haskell analysis: export IR then pipe into analyzer
-"$WEFT_EXPORT" "$FILE" | cabal run -v0 weft-analysis 2>/dev/null > "$hask_out"
+"$WEFT_EXPORT" "$FILE" | "$ANALYSIS_BIN" > "$hask_out"
 
 if [ "$RAW" = true ]; then
   echo "--- = Swift (weft-export --analyze)"
@@ -42,5 +43,5 @@ if [ "$RAW" = true ]; then
     --label "Haskell (weft-analysis)"       <(python3 -m json.tool "$hask_out") \
     || true
 else
-  python3 "$SCRIPT_DIR/weft-diff.py" "$swift_out" "$hask_out"
+  "$DIFF_BIN" "$swift_out" "$hask_out"
 fi

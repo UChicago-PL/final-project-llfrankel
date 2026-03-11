@@ -14,7 +14,7 @@ import qualified Data.Set as Set
 -- "Free" means they vary, e.g. x and y in a 2D image
 -- "Bound" means they are pinned to one value by the context (e.g. time on a single data fraeme)
 -- The data in a single image varies across x and y, but is constant over time.
-data Access = Free | Bound
+data Access = Bound | Free
   deriving (Show, Eq, Ord)
 
 -- | A named coordinate dimension like x, y, or time, as well as if its free or bound

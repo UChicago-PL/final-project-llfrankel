@@ -171,3 +171,153 @@ from the base domain, and the substitution expression's domain is added.
   with argument hardware during annotation.
 - `addsState` — whether this primitive introduces statefulness.
   Currently only true for "cache".
+
+# WEFT Analysis Output — JSON Specification
+
+The top-level object:
+
+    {
+      "signals":      [<SignalAnnotation>, ...],
+      "bundles":      [<BundleAnnotation>, ...],
+      "swatches":     [<Swatch>, ...],
+      "dependencies": { <string>: [<string>, ...], ... }
+    }
+
+## SignalAnnotation
+
+    {
+      "name":     <string>,
+      "domain":   [<DimensionSpec>, ...],
+      "hardware": [<string>, ...],
+      "stateful": <bool>,
+      "pure":     <bool>
+    }
+
+One entry per strand in the program, sorted by name. Each signal is
+identified by `"bundle.strand"` (e.g. `"img.r"`, `"trail.val"`).
+
+Signals with numeric strand indices also appear (e.g. `"img.0"`,
+`"brightness.0"`) — these come from positional references like
+`camera(...)` where the lowered IR uses index 0, 1, 2 rather than
+named fields. Both the named and numeric forms are present when
+both referencing styles exist.
+
+- `name` — `"bundleName.strandName"` or `"bundleName.index"`.
+- `domain` — list of dimensions this signal varies over. Each entry
+  has `name` and `access` ("free" or "bound"). Sorted by name.
+  Examples:
+  - `[{name:"x", access:"free"}, {name:"y", access:"free"}]` — spatial
+  - `[{name:"t", access:"bound"}]` — time-varying only
+  - `[]` — constant
+- `hardware` — hardware tags required by this signal, sorted.
+  Empty means no hardware dependency. Values: "camera", "gpu",
+  "microphone", "speaker", or custom strings.
+- `stateful` — true if the signal depends on `cache` or `cacheRead`.
+- `pure` — true if `hardware` is empty AND `stateful` is false.
+  Redundant but convenient for diffchecking.
+
+### Annotation propagation rules
+
+Domain and hardware propagate bottom-up through expressions:
+
+| Expression type           | Domain                                                   | Hardware                  |
+| ------------------------- | -------------------------------------------------------- | ------------------------- |
+| `num`                     | `[]`                                                     | `[]`                      |
+| `param` (coordinate name) | `[that dimension]`                                       | `[]`                      |
+| `me.field`                | `[coordinateSpecs[field]]`                               | `[]`                      |
+| `bundle.strand`           | recursive from referenced strand                         | recursive                 |
+| `binary`, `unary`         | union of operand domains                                 | union of operand hardware |
+| math builtin (sin, etc.)  | union of arg domains                                     | union of arg hardware     |
+| primitive builtin         | see below                                                | args hw UNION spec hw     |
+| `call`                    | union of arg domains                                     | union of arg hardware     |
+| `extract`                 | same as inner call                                       | same as inner call        |
+| `remap`                   | base domain minus remapped dim, plus substitution domain | union                     |
+| `cacheRead`               | `[]`                                                     | `[]`, stateful=true       |
+
+Primitive builtin domain rules:
+
+- If `outputDomain` is non-empty: **replaces** arg domains (e.g. `camera` produces `[x,y,t]`)
+- If `outputDomain` is empty AND `addsState` is true: **inherits** arg domains (the `cache` pattern)
+- If `outputDomain` is empty AND `addsState` is false: **merges** arg domains
+
+Domain merging: dimensions are unioned by name. If the same dimension
+appears with both "free" and "bound", "bound" wins (more restrictive).
+
+Stateful propagation: `stateful` is true if any sub-expression is
+stateful OR the builtin has `addsState: true`.
+
+## BundleAnnotation
+
+    {
+      "name":     <string>,
+      "backend":  <string | null>,
+      "hardware": [<string>, ...],
+      "pure":     <bool>,
+      "isSink":   <bool>
+    }
+
+One entry per bundle in the program, sorted by name.
+
+- `name` — bundle name.
+- `backend` — the backend that owns this bundle, or `null` if pure.
+  Determined by:
+  1. Find the union of hardware across all strands in this bundle.
+  2. Find the backend whose `hardwareOwned` intersects that hardware.
+  3. If no intersection, check if the bundle is an output sink
+     (e.g. "display" -> "visual", "play" -> "audio").
+  4. If neither, `null` — the bundle is pure and gets duplicated
+     into whichever swatches need it.
+- `hardware` — union of hardware tags across all strands, sorted.
+- `pure` — true if no hardware and no statefulness in any strand.
+- `isSink` — true if this bundle name is an `outputSink` for any
+  backend (e.g. "display", "play", "scope").
+
+## Swatch
+
+    {
+      "backend":       <string>,
+      "bundles":       [<string>, ...],
+      "inputBuffers":  [<string>, ...],
+      "outputBuffers": [<string>, ...],
+      "isSink":        <bool>
+    }
+
+Swatches are compilation units — connected subgraphs of bundles
+assigned to the same backend. Ordered topologically (dependencies
+before dependents). All arrays are sorted alphabetically.
+
+- `backend` — backend identifier ("visual" or "audio").
+- `bundles` — bundle names in this swatch. Includes:
+  - Bundles routed here by hardware ownership
+  - Pure bundles pulled in as transitive dependencies
+  - Output sink bundles for this backend
+- `inputBuffers` — bundle names read from other swatches
+  (cross-domain inputs). These are buffers that must be filled
+  by another swatch before this one executes.
+- `outputBuffers` — bundle names that other swatches read from
+  this one. These bundles must be written to shared buffers.
+- `isSink` — true if this swatch contains an output sink bundle
+  for its backend.
+
+### Partitioning algorithm
+
+1. For each bundle, get hardware from annotations.
+2. Route to the backend whose `hardwareOwned` intersects.
+3. Pure bundles (no hardware) are unrouted initially.
+4. For each backend with routed bundles or a sink:
+   - Pull in all pure transitive dependencies.
+   - A pure bundle may appear in multiple swatches (duplicated).
+5. Compute cross-domain buffers: if swatch A references a bundle
+   in swatch B, that bundle becomes an outputBuffer of B and an
+   inputBuffer of A.
+
+## Dependencies
+
+    { "bundleName": ["dep1", "dep2", ...], ... }
+
+Bundle-level dependency graph. Keys are all bundle names in the
+program. Values are sorted lists of bundles that the key directly
+depends on (self-references excluded).
+
+Built by collecting all bundle references from each strand's
+expression tree (excluding `me`).
