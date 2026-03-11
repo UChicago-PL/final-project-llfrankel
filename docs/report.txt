@@ -91,6 +91,7 @@ the pipeline together and handles the IO.
 
 
 ================ MODULES ================
+A description of each of the files, location, what they do
 
 src/
   - IR.hs: ADTs for the full WEFT IR (programs, bundles, strands,
@@ -129,8 +130,25 @@ instances everywhere.
 
 
 ================ TESTING ================
+I wasn't able to do as much QuickCheck testing as I originally hoped. Writing
+generators for valid program graphs is indeed quite difficult. I was able to
+write QuickCheck tests for the annotation algebra (the Semigroup/monoid instance
+on Annotation). I think this is the part of the pipeline where a bug would be
+hardest to catch. The tests verify the semigroup/monoid properties, as well as
+the logic of the algebra itself. They can be run with `cabal test`.
 
+Since the language is still evolving, I think exhaustive QuickCheck would have
+been premature anyways. I hope to come back and implement some of the more
+complex QuickCheck properties once I have a clearer vision of how everything
+fits together.
 
+The "semantic" diff checking proved to be very useful in practice. The diffed
+outputs of the Haskell and Swift analyzers were hard to parse, mostly due to the
+volume of differences and the deeply nested JSON. Writing the diff module turned
+this into an actually useful tool, which is great. It illuminates the
+differences between the two implementations instead of deciding which one is
+"correct", but I think that is more useful as I make decisions about how the
+ runtime should work.
 
 ================ REFLECTIONS ================
 I have been actively using the Haskell tool to figure out why WEFT programs
@@ -142,8 +160,8 @@ analysis output is non-deterministic. Consecutive runs on the same input
 produce different partition results. I then ran just the Swift analyzer on these
 inputs, and saw variance in the output. This is likely due to iterating over
 Swift Dictionary types (which are unordered), but I haven't had time to fully
-investigate yet. This is exactly the kind of bug the tool was built to catch,
-which is great.
+investigate yet. This is exactly the kind of bug the tool was built to catch.
+Yay!
 
 Also, having to reason about my original implementation functionally has
 helped me think about the language in a different light. There are some things
