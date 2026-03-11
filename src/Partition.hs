@@ -14,24 +14,26 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import DepGraph (DepGraph, transDeps)
 
-data Swatch = Swatch
-  { swatchBackend :: BackendId,
-    swatchBundles :: Set BundleName,
-    swatchInputs :: Set BundleName,
-    swatchOutputs :: Set BundleName,
-    swatchIsSink :: Bool
+data Swatch = Swatch -- a group of bundles assigned to a single backend for compilation as a single unit.
+  { swatchBackend :: BackendId, -- which backend this swatch will be compiled in.
+    swatchBundles :: Set BundleName, -- the bundles in this swatch
+    swatchInputs :: Set BundleName, -- bundles this swatch uses from other swatches
+    swatchOutputs :: Set BundleName, -- bundles in this swatch that other swatches use.
+    swatchIsSink :: Bool -- if this swatch is final output
   }
   deriving (Show, Eq)
 
-data SwatchGraph = SwatchGraph
-  { swatches :: [Swatch],
-    bundleToSwatch :: Map BundleName BackendId
+data SwatchGraph = SwatchGraph -- full partition result
+  { swatches :: [Swatch], -- all swatches
+    bundleToSwatch :: Map BundleName BackendId -- lookup from bundle to which backend owns it
   }
   deriving (Show, Eq)
 
 data PartError
-  = CycleDetected
+  = CycleDetected -- dependency graph has a cycle, so topo sort fails
   | HardwareConflict BundleName (Set BackendId)
+  -- a bundle transitively requires hardware owned by multiple backends
+  -- so it can't be unambiguously routed.
   deriving (Show, Eq)
 
 type BackendId = String
@@ -44,7 +46,7 @@ type HardwareMap = Map String BackendId
 
 type SinkMap = Map BundleName BackendId
 
-data PartInput = PartInput
+data PartInput = PartInput -- Everything the partitioner needs
   { partGraph :: DepGraph,
     partHardware :: HardwareMap,
     partSinks :: SinkMap,

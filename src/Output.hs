@@ -12,7 +12,7 @@ import DepGraph (DepGraph)
 import IR (BackendSpec (..), Dimension, Program (..))
 import Partition (Swatch (..), SwatchGraph (..))
 
-data SignalAnnotation = SignalAnnotation
+data SignalAnnotation = SignalAnnotation -- per strand output of the strand annotation
   { sigName :: String,
     sigDomain :: [Dimension],
     sigHardware :: [String],
@@ -20,6 +20,8 @@ data SignalAnnotation = SignalAnnotation
     sigPure :: Bool
   }
 
+-- per-bundle summary of annotations
+-- merges annotations from each comppnent
 data BundleAnnotation = BundleAnnotation
   { bunName :: String,
     bunBackends :: [String],
@@ -74,6 +76,8 @@ instance ToJSON Swatch where
         "isSink" .= swatchIsSink s
       ]
 
+-- assembles JSON-able analysis result
+-- Annotations, dependency graph, swatch partitions, and backend specs
 buildOutput :: Map String Annotation -> DepGraph -> SwatchGraph -> [BackendSpec] -> Program -> AnalysisOutput
 buildOutput anns graph sg backends prog =
   AnalysisOutput

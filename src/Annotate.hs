@@ -15,10 +15,10 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import IR
 
-data Annotation = Annotation
-  { aDomain :: Map String Dimension,
-    aHardware :: Set String,
-    aStateful :: Bool
+data Annotation = Annotation -- the computed properties of a single strand
+  { aDomain :: Map String Dimension, -- what dimensions it varies over
+    aHardware :: Set String, -- what hardware it requires
+    aStateful :: Bool -- whether it relies on the state from a previous frame
   }
   deriving (Show, Eq)
 
@@ -30,22 +30,23 @@ instance Semigroup Annotation where
         aStateful = aStateful a || aStateful b
       }
     where
-      pick d1 d2
+      pick d1 d2 -- how to merge two annotations
+      -- binding a dimension restricts it, and that restriction must be preserved when combining.
         | dimAccess d1 == Bound || dimAccess d2 == Bound = d1 {dimAccess = Bound}
         | otherwise = d1
 
 instance Monoid Annotation where
   mempty = Annotation Map.empty Set.empty False
 
-data AnnotateEnv = AnnotateEnv
+data AnnotateEnv = AnnotateEnv -- the backend-specific context for annotation
   { envBundles :: Map String Bundle,
     envCoords :: Map String Dimension,
     envPrimitives :: Map String PrimitiveSpec
   }
 
-data AnnotateState = AnnotateState
-  { stMemo :: Map String Annotation,
-    stComputing :: Set String
+data AnnotateState = AnnotateState -- memoization and cycle detection state
+  { stMemo :: Map String Annotation, -- cache completed annotations
+    stComputing :: Set String -- currently being computed
   }
 
 type Annotator a = ReaderT AnnotateEnv (State AnnotateState) a

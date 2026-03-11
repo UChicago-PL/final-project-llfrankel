@@ -3,21 +3,30 @@
 module IR where
 
 import Data.Aeson
+import Data.Aeson.Encoding (value)
 import Data.Aeson.Types (Parser)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 
+-- | Whether a coordinate dimension is iterated over fixed at a single value
+-- "Free" means they vary, e.g. x and y in a 2D image
+-- "Bound" means they are pinned to one value by the context (e.g. time on a single data fraeme)
+-- The data in a single image varies across x and y, but is constant over time.
 data Access = Free | Bound
   deriving (Show, Eq, Ord)
 
+-- | A named coordinate dimension like x, y, or time, as well as if its free or bound
 data Dimension = Dimension
   { dimName :: String,
     dimAccess :: Access
   }
   deriving (Show, Eq, Ord)
 
+-- | Describes a built-in operation that a backend provides
+-- What hardware it uses, what domain it outputs, and if it is stateful
+-- For example "camera" uses the webcam, outputs x and y, and is not stateful
 data PrimitiveSpec = PrimitiveSpec
   { primName :: String,
     primOutputDomain :: [Dimension],
@@ -26,6 +35,8 @@ data PrimitiveSpec = PrimitiveSpec
   }
   deriving (Show, Eq)
 
+-- | A compilation target (i.e. something WEFT can compile down to)
+-- Declares hardware it owns, outputs it prvides, dimensions it defines, and primitives it implements
 data BackendSpec = BackendSpec
   { backendId :: String,
     backendHardware :: [String],
@@ -35,6 +46,8 @@ data BackendSpec = BackendSpec
   }
   deriving (Show, Eq)
 
+-- | One output channel of a bundle (e.g. the "r" channel of a color bundle)
+-- with an index and an expression computing its value
 data Strand = Strand
   { strandName :: String,
     strandIndex :: Int,
@@ -42,12 +55,14 @@ data Strand = Strand
   }
   deriving (Show, Eq)
 
+-- | A named computation node in the program graph, containing one or more strands
 data Bundle = Bundle
   { bundleName :: String,
     bundleStrands :: [Strand]
   }
   deriving (Show, Eq)
 
+-- | A reusable function -- has parameters, local bundles, and return expressions
 data Spindle = Spindle
   { spindleName :: String,
     spindleParams :: [String],
@@ -56,6 +71,7 @@ data Spindle = Spindle
   }
   deriving (Show, Eq)
 
+-- | The full program graph -- all bundles, spindles, evaluation order, and resource declarations
 data Program = Program
   { progBundles :: Map String Bundle,
     progSpindles :: Map String Spindle,
@@ -65,12 +81,14 @@ data Program = Program
   }
   deriving (Show, Eq)
 
+-- | One entry in the program's evaluation order -- a bundle name and optionally which specific strands
 data OrderEntry = OrderEntry
   { orderBundle :: String,
     orderStrands :: Maybe [String]
   }
   deriving (Show, Eq)
 
+-- | Top-level input to the analyzer -- a program plus the set of backends to target
 data AnalysisInput = AnalysisInput
   { inputProgram :: Program,
     inputBackends :: [BackendSpec]
@@ -78,16 +96,17 @@ data AnalysisInput = AnalysisInput
   deriving (Show, Eq)
 
 data Expr
-  = Num Double
-  | Param String
-  | Index String Expr
+  = Num Double -- literal number
+  | Param String -- parameter reference
+  | Index String Expr -- read a strand from another bundle (this is how data dependencies form)
   | Binary String Expr Expr
   | Unary String Expr
-  | Call String [Expr]
-  | Builtin String [Expr]
-  | Extract Expr Int
-  | Remap Expr (Map String Expr)
-  | CacheRead String Int
+  | Call String [Expr] -- invoke a spindle
+  | Builtin String [Expr] -- call a backend-provided primitive (I hope to get rid of this, and have a dynamic lookup)
+  | Extract Expr Int -- pull one return value from a multi-return call
+  | Remap Expr (Map String Expr) -- re-index an expression under different coordinate substitutions
+  -- e.g. take a function f(x) to f(-x), stuff like that
+  | CacheRead String Int -- read from a stateful cache (previous frame data)
   deriving (Show, Eq)
 
 instance FromJSON Access where
