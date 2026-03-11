@@ -25,17 +25,17 @@ buildGraph prog = Map.mapWithKey Set.delete raw
     refsForBundle b = foldMap (bundleRefs . strandExpr) (bundleStrands b)
 
 topoSort :: DepGraph -> Maybe [String]
-topoSort graph = reverse <$> visit (Map.keys graph) Set.empty Set.empty []
+topoSort graph = reverse . snd <$> visit (Map.keys graph) Set.empty Set.empty []
   where
-    visit [] _ _ result = Just result
+    visit [] visited _ result = Just (visited, result)
     visit (n : ns) visited visiting result
       | Set.member n visited = visit ns visited visiting result
       | Set.member n visiting = Nothing
       | otherwise = do
           let deps = Map.findWithDefault Set.empty n graph
               visiting' = Set.insert n visiting
-          result' <- visit (Set.toList deps) visited visiting' result
-          visit ns (Set.insert n visited) (Set.delete n visiting') (n : result')
+          (visited', result') <- visit (Set.toList deps) visited visiting' result
+          visit ns (Set.insert n visited') (Set.delete n visiting') (n : result')
 
 -- | Reverse the dependency graph: for each bundle, which bundles depend on it.
 dependents :: DepGraph -> DepGraph

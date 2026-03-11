@@ -4,6 +4,7 @@ module Partition
     PartInput (..),
     PartError (..),
     partition,
+    computeClaims,
   )
 where
 
@@ -49,6 +50,7 @@ data PartInput = PartInput
     partSinks :: SinkMap,
     partBuiltins :: Map BundleName (Set String)
   }
+  deriving (Show)
 
 -- | Partition a program's bundles into backend-specific swatches.
 partition :: PartInput -> Either PartError SwatchGraph
