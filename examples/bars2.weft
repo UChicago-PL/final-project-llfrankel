@@ -1,0 +1,6 @@
+#include "std_noise.weft"
+cam[r,g,b] = camera(1-me.x, me.y)
+snd = sample("/Users/leo/Documents/01-Projects/weft/Orchid Forked.mp3")
+play[l, r] = [snd.0 - snd.1, snd.1 - snd.0]
+shift[r,g,b] = cam -> {(0..3)(me.y ~ me.y + abs(snd.0(me.t ~ mod(me.t, 120) + floor(me.x * 200) / 200)) * 0.1)}
+display[r,g,b] = shift

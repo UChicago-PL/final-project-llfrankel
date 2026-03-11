@@ -1,0 +1,31 @@
+// Spindle for "breathing coordinates
+spindle breathe(x, y, t, amount) {
+    phase[val] = fract(t / 5)
+    breath[val] = smoothstep(0, 0.3, phase.val) * smoothstep(1, 0.4, phase.val)
+    s[val] = 0.85 + breath.val * amount
+    return.0 = (x - 0.5) / s.val + 0.5
+    return.1 = (y - 0.5) / s.val + 0.5
+}
+
+coords[x,y] = breathe(me.x, me.y, me.t, 0.25)
+
+
+
+warp.val = 0.1
+grad.val = coords.y + warp.val
+
+test[x,y] = [coords.x, grad.val]
+
+// Palette [r,g,b]
+brown = [0.28, 0.15, 0.12]
+red = [0.9, 0.25, 0.15]
+orange = [1.0, 0.55, 0.2]
+pink = [0.92, 0.75, 0.8]
+cyan = [0.3, 0.7, 0.85]
+
+c1[r,g,b] = brown -> {lerp((0..3), red.(0..3), smoothstep(0.0, 0.25, grad.val))}
+					 -> {lerp((0..3), orange.(0..3), smoothstep(0.2, 0.45, grad.val))}
+					 -> {lerp((0..3), pink.(0..3), smoothstep(0.4, 0.65, grad.val))}
+					 -> {lerp((0..3), cyan.(0..3), smoothstep(0.6, 0.85, grad.val))}
+
+display[r,g,b] = c1

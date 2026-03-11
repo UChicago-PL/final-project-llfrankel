@@ -1,48 +1,44 @@
-module DepGraph (buildGraph, topoSort, dependents, transDeps) where
+module DepGraph
+  ( DepGraph,
+    buildGraph,
+    topoSort,
+    dependents,
+    transDeps,
+  )
+where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import IR
+import IRHelpers
 
-bundleRefs :: Expr -> Set String
-bundleRefs expr = case expr of
-  Num _ -> mempty
-  Param _ -> mempty
-  CacheRead _ _ -> mempty
-  Index "me" e -> bundleRefs e
-  Index b e -> Set.insert b $ bundleRefs e
-  Binary _ l r -> bundleRefs l <> bundleRefs r
-  Unary _ e -> bundleRefs e
-  Call _ args -> foldMap bundleRefs args
-  Builtin _ args -> foldMap bundleRefs args
-  Extract e _ -> bundleRefs e
-  Remap b subs -> bundleRefs b <> foldMap bundleRefs (Map.elems subs)
+type DepGraph = Map String (Set String)
 
 -- | Build a dependency graph from a program. Each bundle maps to the
 -- set of other bundles it references. Self-references are excluded.
-buildGraph :: Program -> Map String (Set String)
+buildGraph :: Program -> DepGraph
 buildGraph prog = Map.mapWithKey Set.delete raw
   where
     raw = Map.map refsForBundle $ progBundles prog
     refsForBundle b = foldMap (bundleRefs . strandExpr) (bundleStrands b)
 
-topoSort :: Map String (Set String) -> Maybe [String]
-topoSort graph = reverse <$> visit (Map.keys graph) Set.empty Set.empty []
+topoSort :: DepGraph -> Maybe [String]
+topoSort graph = reverse . snd <$> visit (Map.keys graph) Set.empty Set.empty []
   where
-    visit [] _ _ result = Just result
+    visit [] visited _ result = Just (visited, result)
     visit (n : ns) visited visiting result
       | Set.member n visited = visit ns visited visiting result
       | Set.member n visiting = Nothing
       | otherwise = do
           let deps = Map.findWithDefault Set.empty n graph
               visiting' = Set.insert n visiting
-          result' <- visit (Set.toList deps) visited visiting' result
-          visit ns (Set.insert n visited) (Set.delete n visiting') (n : result')
+          (visited', result') <- visit (Set.toList deps) visited visiting' result
+          visit ns (Set.insert n visited') (Set.delete n visiting') (n : result')
 
 -- | Reverse the dependency graph: for each bundle, which bundles depend on it.
-dependents :: Map String (Set String) -> Map String (Set String)
+dependents :: DepGraph -> DepGraph
 dependents graph =
   Map.fromListWith
     Set.union
@@ -52,7 +48,7 @@ dependents graph =
     ]
 
 -- | All bundles reachable from a starting node, transitively.
-transDeps :: Map String (Set String) -> String -> Set String
+transDeps :: DepGraph -> String -> Set String
 transDeps graph start = dfs Set.empty (Map.findWithDefault Set.empty start graph)
   where
     dfs = Set.foldl' visit

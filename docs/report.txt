@@ -1,0 +1,181 @@
+================ OVERVIEW ================
+WEFT is a programming language I am working on for domain-agnostic multimedia
+creative coding. The idea is that all media are functions from coordinates to
+values (e.g., the red channel of an image is (x, y) -> red_intensity). Programs
+in WEFT are graphs: nodes are computations, edges are data dependencies. The
+compiler needs to infer properties of each node before it can generate code:
+
+- Is this node pure (deterministic, cacheable)?
+- Is this node live (reads from external hardware)?
+- Is this node stateful (depends on history)?
+- Which runtime (GPU, AudioCore, MIDI, etc.) should execute it?
+
+These properties are algebraic: if node A depends on node B, and B is live, then
+A is live too. Combining two pure nodes yields a pure node; combining anything
+with a stateful node yields stateful. Domains merge by union, with a "most
+restrictive wins" rule for conflicting access patterns.
+
+I have a working compiler in Swift, but the analysis logic is interleaved with
+codegen and runtime concerns. This project extracts the core algorithm into a
+standalone Haskell implementation. Haskell's ADTs and pattern matching make the
+propagation rules explicit and readable, so it serves as a specification of the
+intended semantics. It also works as a verification tool: run both analyzers on
+the same input and diff the results to catch bugs in either implementation.
+
+
+
+================ DOCS ================
+- `weft.txt`: I've added a bit of context about WEFT here. You can also read
+  about the language at https://weft.media. It's still a work in progress.
+- `acknowledge.txt`: acknowledgements on outside resources, AI use, people I
+  talked to, etc.
+- `contact.txt`, `proposal.txt`, `progress.txt`: as requested
+- `json-specs.md`: specification of JSON from the Swift side.
+
+
+
+================ USAGE ================
+The tool reads JSON from stdin and writes annotated JSON to stdout:
+`weft-export myfile.weft | cabal run -v0 weft-analysis`
+
+You can get the JSON IR from a `.weft` file by running
+`swift run weft-export myfile.weft`
+
+The hask-weft-analyze shell script is a utility that wraps the full comparison
+pipeline. It runs both the Swift and Haskell analyzers on a .weft, and
+diffs the result using a Haskell semantic diff checker (weft-diff). Usage is:
+`./hask-weft-analyze myfile.weft`
+or
+`./hask-weft-analyze --raw examples/bars.weft`
+for the full JSON diff instead of the semantic summary.
+
+As an example:
+    > ./hask-weft-analyze examples/bars.weft
+
+      "cam":
+          backends:  Swift=[audio]  Haskell=[visual]
+      "display":
+        backends: Swift=[audio, visual] Haskell=[visual]
+      "audio":
+        bundles: Swift=[cam, display, play, snd] Haskell=[play, snd]
+        outputBuffers: Swift=[cam] Haskell=[snd]
+      "visual":
+        bundles: Swift=[display] Haskell=[cam, display]
+        inputBuffers: Swift=[cam] Haskell=[snd]
+
+I've included a few actual WEFT files in `examples/`
+
+================ DESIGN ================
+The tool is structured as a pipeline of transformations on the IR. JSON comes in,
+gets parsed into IR types, flows through three analysis stages, and comes out
+as annotated JSON.
+
+The data flow is:
+
+1. `AnalysisInput` (program IR + backend specs) is parsed from JSON via Aeson
+2. `DepGraph` is built from bundle expressions: a `Map String (Set String)`
+   of which bundles reference which
+3. `SwatchGraph` is produced by the partitioner, which routes bundles to
+   backends based on hardware ownership and sink declarations, validates for
+   conflicts, and pulls in pure transitive dependencies
+4. `Map String Annotation` is produced by the annotator, which recursively
+   walks each strand's expression tree, memoizing results and detecting cycles
+5. `AnalysisOutput` assembles everything into per-strand and per-bundle views
+   for JSON output
+
+The project is set up as a Cabal library (`src/`) with an executable
+(`app/Main.hs`) and a test suite (`test/`). The library exposes the core
+modules so they can be used and tested independently. The executable just wires
+the pipeline together and handles the IO.
+
+
+
+================ MODULES ================
+A description of each of the files, location, what they do
+
+src/
+  - IR.hs: ADTs for the full WEFT IR (programs, bundles, strands,
+     expressions, backend specs) plus Aeson FromJSON/ToJSON instances
+
+  - IRHelpers.hs: Generic expression tree fold, plus helpers that extract
+     bundle references and builtin/hardware usage from expressions
+
+  - DepGraph.hs: Dependency graph construction, topo sort with cycle
+     detection, graph reversal, and transitive closure
+
+  - Annotate.hs: The annotation algebra (Semigroup/Monoid on Annotation),
+     memoized recursive expression traversal, cycle-implies-stateful detection
+      - Figuring out this was a semigroup/monoid was super cool. Made everything
+        much easier to write and think about. This was my favorite part of the
+        project I think.
+
+  - Partition.hs: The meat. Routes bundles to backends via hardware claims
+     and sink assignments, validates for conflicts, expands swatches with pure
+    transitive dependencies
+
+  - Output.hs: Assembles per-strand and per-bundle annotation views, ToJSON
+     instances for the final output consumed by the Swift compiler
+
+app/Main.hs: Reads JSON from stdin, wires the pipeline together, writes result
+to stdout
+
+hask-weft-analyze: Shell script that runs both Swift and Haskell analyzers on
+a .weft file and diffs the results. Usage described above
+
+diff/Main.hs: diff helper. Parses two JSON analysis outputs (Swift and
+Haskell), matches entities by key field, and reports field-by-field mismatches.
+Uses Aeson's generic Value type to compare without needing to define "toJSON"
+instances everywhere.
+
+
+
+================ TESTING ================
+I wasn't able to do as much QuickCheck testing as I originally hoped. Writing
+generators for valid program graphs is indeed quite difficult. I was able to
+write QuickCheck tests for the annotation algebra (the Semigroup/monoid instance
+on Annotation). I think this is the part of the pipeline where a bug would be
+hardest to catch. The tests verify the semigroup/monoid properties, as well as
+the logic of the algebra itself. They can be run with `cabal test`.
+
+Since the language is still evolving, I think exhaustive QuickCheck would have
+been premature anyways. I hope to come back and implement some of the more
+complex QuickCheck properties once I have a clearer vision of how everything
+fits together.
+
+The "semantic" diff checking proved to be very useful in practice. The diffed
+outputs of the Haskell and Swift analyzers were hard to parse, mostly due to the
+volume of differences and the deeply nested JSON. Writing the diff module turned
+this into an actually useful tool, which is great. It illuminates the
+differences between the two implementations instead of deciding which one is
+"correct", but I think that is more useful as I make decisions about how the
+ runtime should work.
+
+================ REFLECTIONS ================
+I have been actively using the Haskell tool to figure out why WEFT programs
+I write are not behaving how I want them to. It has exposed quite a few
+flaws in my original implementation, which is very useful.
+
+Running the diff checker on example programs revealed that the Swift compiler's
+analysis output is non-deterministic. Consecutive runs on the same input
+produce different partition results. I then ran just the Swift analyzer on these
+inputs, and saw variance in the output. This is likely due to iterating over
+Swift Dictionary types (which are unordered), but I haven't had time to fully
+investigate yet. This is exactly the kind of bug the tool was built to catch.
+Yay!
+
+Also, having to reason about my original implementation functionally has
+helped me think about the language in a different light. There are some things
+I will do differently in my next version that I would not have realized if I
+had not worked through it in Haskell.
+
+The biggest design change was that partitioning runs BEFORE annotation, not
+after. In the Swift compiler, annotation runs first on the whole program
+with a single merged environment from all backends. This means when two backends
+use the same coordinate (most importantly, "time"), one arbitrary "wins". So a
+node that should be both audio and visual would only be audio.
+
+In the Haskell version, the program is first partitioned into swatches
+(compilation units, one per backend), then each swatch is annotated using that
+backend's semantics. The same bundle can get different annotations under
+different backends: "time" is sequential in a visual context, but freely
+seekable in audio.

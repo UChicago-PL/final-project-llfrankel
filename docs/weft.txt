@@ -1,0 +1,24 @@
+BACKGROUND
+
+WEFT is a programming language for multimedia creative coding (https://weft.media)
+
+The core idea is that all media are functions from coordinates to values -- an
+image is (x, y) -> color, audio is (t, sampleRate) -> amplitude. Programs are graphs
+of computations with data dependencies between them.
+
+Right now, WEFT is transpiled to Swift and Metal shader language. I plan to add
+more transpilation targets (called "Backends") in the future.
+
+In order to figure out which backend each chunk of WEFT code should go to, the
+compiler needs to figure out properties of each computation: what dimensions does it
+operate over (spatial? temporal?), does it need hardware (camera, microphone),
+and is it stateful (depends on previous frames)? These properties propagate
+through the graph -- if A depends on B and B needs a camera, then A transitively
+needs a camera too.
+
+VOCAB:
+  - Bundle: a named computation node in the graph
+  - Strand: one output channel of a bundle (e.g. a color bundle has r, g, b strands)
+  - Swatch: a group of bundles assigned to one backend for compilation
+  - Backend: a compilation target (e.g. Metal GPU shaders, Swift audio engine)
+  - Domain: the set of dimensions a computation varies over (x, y, t, sampleRate, etc.)

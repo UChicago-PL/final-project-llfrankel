@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WEFT_EXPORT="$SCRIPT_DIR/weft-export-2"
+
+RAW=false
+FILE=""
+for arg in "$@"; do
+  case "$arg" in
+    --raw) RAW=true ;;
+    *) FILE="$arg" ;;
+  esac
+done
+
+if [ -z "$FILE" ]; then
+  echo "Usage: $0 [--raw] <file.weft>" >&2
+  exit 1
+fi
+
+if [ ! -f "$FILE" ]; then
+  echo "File not found: $FILE" >&2
+  exit 1
+fi
+
+ANALYSIS_BIN=$(cabal list-bin weft-analysis 2>/dev/null)
+DIFF_BIN=$(cabal list-bin weft-diff 2>/dev/null)
+
+swift_out=$(mktemp)
+hask_out=$(mktemp)
+trap 'rm -f "$swift_out" "$hask_out"' EXIT
+
+"$WEFT_EXPORT" --analyze "$FILE" > "$swift_out"
+
+"$WEFT_EXPORT" "$FILE" | "$ANALYSIS_BIN" > "$hask_out"
+
+if [ "$RAW" = true ]; then
+  echo "--- = Swift (weft-export --analyze)"
+  echo "+++ = Haskell (weft-analysis)"
+  echo ""
+  diff --color -U 10 \
+    --label "Swift (weft-export --analyze)" <(python3 -m json.tool "$swift_out") \
+    --label "Haskell (weft-analysis)"       <(python3 -m json.tool "$hask_out") \
+    || true
+else
+  "$DIFF_BIN" "$swift_out" "$hask_out"
+fi

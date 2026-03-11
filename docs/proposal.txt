@@ -44,3 +44,10 @@ SOURCES/INSPIRATION
 I'm taking an informal seminar class with Prof. Alex Warth from UCLA in which we have talked about Haskell, QuickCheck, and the general idea of implementing runtimes in various ways/languages to test them.
 
 The Swift implementation was built (not ideated) with LLM assistance. The Haskell implementation for this assignment will be entirely my own work.
+
+
+
+=== RESPONSE
+CM: This seems like a very interesting project. Aeson should be very straightforward to work with, it’s ultimately a pretty much one-to-one representation of JSON in Haskell’s type system. I think the easy/medium tasks you list are all doable, and I would also try to include some QuickCheck properties of correctness as part of the base project. Instances of QuickCheck generators should probably be a stretch goal, though, as unless your datatype makes all illegal program graphs (if such things exist) unrepresentable, you’ll have to manually do so when writing the generators, which can be fairly complicated.
+
+SK: Interesting. Conversion of part of a Swift project to Haskell. Concur w/ CM – do easy + medium, and at least some QuickCheck. This could easily be the basis for a research project on the semantic correctness of LLM generated code. Look at the aeson library.

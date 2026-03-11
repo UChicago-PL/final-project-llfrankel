@@ -1,7 +1,31 @@
+================ DOCUMENTATION ================
+- Aeson Hackage documentation via Hackage for JSON encoding/decoding in IR.hs
+  and Output.hs.
+- Looked up intercalate from Data.List and getArgs from System.Environment for
+  the diff checker. For both of these I knew the kind of function I wanted,
+  I just needed to find Haskell's version of it. Intercalate is a terrible name!
+- I've been reading about and implementing some of HLS's suggestions where I
+  understood them. I've tried to note this everywhere in the code with comments
+  like "-- HLS recommended".
 
 
-- Aeson Hackage documentation (https://hackage.haskell.org/package/aeson-0.9.0.1/docs/Data-Aeson.html)
-  - Used for `IR.hs` Aeson encoding/decoding and troubleshooting that
+
+================ PEOPLE ================
+- I'm taking an informal seminar class with Prof. Alex Warth from UCLA in which
+  we have talked about Haskell, QuickCheck, and the general idea of implementing
+  runtimes in various ways/languages to test them.
 
 
-- I'm taking an informal seminar class with Prof. Alex Warth from UCLA in which we have talked about Haskell, QuickCheck, and the general idea of implementing runtimes in various ways/languages to test them. We talked about how I was approaching this project. Nothing specific about implementation, more generally the benefit of implementing some of the analysis in Haskell to check my original Swift implementation.
+
+================ AI TOOLS ================
+In general I use the Claude models by Anthropic. I did not use AI for most of
+this project, with the following exceptions:
+
+- Implementing the hask-weft-analyze shell script, since I am not very good at
+  Bash, and this did not seem like a job for Haskell.
+- Setting up and debugging my .cabal file. I was having trouble setting up src/
+  as a library that app/Main.hs could call.
+- The file json-specs.md was written/documented using AI tools as part of
+  previous work on the Swift compiler.
+- Helping understand the Aeson documentation around the Value/KeyMap types and
+  functions.
